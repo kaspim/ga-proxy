@@ -27,6 +27,6 @@ server.on('error', (message) => {
     console.log(message);
 });
 
-server.listen(config.PROXY_PORT || 80, () => {
-    console.log('Server listening on port ' + String(config.PROXY_PORT || 80));
+server.listen(config.PROXY_PORT || 8080, () => {
+    console.log('Server listening on port ' + String(config.PROXY_PORT || 8080));
 });
