@@ -1,0 +1,12 @@
+version: "3"
+
+services:
+  node:
+    build:
+      context: .
+      network: host
+    container_name: ga-proxy
+    hostname: ga-proxy
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
