@@ -9,18 +9,13 @@ const server: http.Server = http.createServer(app);
 app.set('trust proxy', true);
 
 app.get('/analytics.js', async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const script: string | null = await new AnalyticsProxy().script();
-    const response: { [key: string]: any } = {
-        code: !!script ? 200 : 404,
-        type: !!script ? 'text/javascript' : 'text/plain',
-        body: !!script ? script : '',
-    };
-    res.status(response.code).setHeader('Content-Type', response.type).send(response.body);
+    const response = await new AnalyticsProxy().script();
+    res.status(response.code).setHeader('Content-Type', response.type).send(response.data || '');
 });
 
 app.get('/collect', async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const response: number = await new AnalyticsProxy().hit(req);
-    res.status(response).send('')
+    const response = await new AnalyticsProxy().hit(req);
+    res.status(response.code).setHeader('Content-Type', response.type).send(response.data || '');
 });
 
 server.on('error', (message) => {

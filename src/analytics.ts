@@ -1,5 +1,5 @@
 import express from 'express';
-import * as request from 'request-promise-native';
+import axios from 'axios';
 import url from 'url';
 import querystring from 'querystring';
 import config from './config';
@@ -19,36 +19,45 @@ class AnalyticsProxy {
         this.publicIpAddress = config.PROXY_DEFAULT_IP;
     }
 
-    public async script(): Promise<string | null> {
-        const source: string | null = await this.download();
-        return source !== null ? source.split(this.replaceMatch).join(this.replaceValue) : null;
+    public async script(): Promise<{ code: number, type: string, data: string | null }> {
+        const response = await AnalyticsProxy.getRequest(this.analyticsScriptUrl, null);
+        return {
+            code: response.status || 500,
+            type: response.headers['content-type'] || 'text/plain',
+            data: response.data?.split(this.replaceMatch).join(this.replaceValue) || null,
+        }
     }
 
-    public hit(req: express.Request): Promise<number> {
+    public async hit(req: express.Request): Promise<{ code: number, type: string, data: string | null }> {
         const uri: url.UrlWithParsedQuery = url.parse(req.url, true);
         const query: querystring.ParsedUrlQuery = uri.query;
         const ip: string | null = req.get('x-forwarded-for') || req.socket?.remoteAddress || null;
-        const options: { [key: string]: object } = {
+        const config: { [key: string]: object } = {
             headers: {
                 'user-agent': req.get('user-agent') || null,
                 'accept-language': req.get('accept-language') || null,
             }
         };
 
-        if (ip !== null) query['uip'] = this.address(ip);
+        if (ip !== null) query['uip'] = AnalyticsProxy.address(ip, this.publicIpAddress);
 
-        return request.get(this.analyticsHitUrl + '?' + querystring.encode(query), options, (error, response) => {
-            return !error ? Number(response.statusCode) : 500;
+        const response = await AnalyticsProxy.getRequest(this.analyticsHitUrl + '?' + querystring.encode(query), config);
+        return {
+            code: response.status || 500,
+            type: response.headers['content-type'] || 'text/plain',
+            data: response.data || null,
+        }
+    }
+
+    private static async getRequest(url: string, config: object | null): Promise<any | null> {
+        return await axios.get(url, config || {}).then(response => {
+            return response;
+        }).catch(error => {
+            return null;
         });
     }
 
-    private download(): Promise<string | null> {
-        return request.get(this.analyticsScriptUrl, (error, response) => {
-            return !error && response.statusCode === 200 ? response.body : null;
-        });
-    }
-
-    private address(ip: string): string {
+    private static address(ip: string, wan: string | null): string {
         const ipv4: RegExp = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
         const internal: string[][] = [
             ['10.0.0.0', '10.255.255.255'],
@@ -63,7 +72,7 @@ class AnalyticsProxy {
             internal.forEach(range => {
                 let min2int: number | null = AnalyticsProxy.ipv4int(range[0]);
                 let max2int: number | null = AnalyticsProxy.ipv4int(range[1]);
-                if ((ip2int !== null && min2int !== null && max2int !== null) && (ip2int >= min2int && ip2int <= max2int)) return this.publicIpAddress || ip || '';
+                if ((ip2int !== null && min2int !== null && max2int !== null) && (ip2int >= min2int && ip2int <= max2int)) return wan || ip || '';
             });
         }
 
@@ -71,12 +80,8 @@ class AnalyticsProxy {
     }
 
     private static ipv4int(ip: string) {
-        try {
-            let int = Number(ip.split('.').map(d => ("000" + d).substr(-3)).join(''));
-            return !isNaN(int) ? int : null;
-        } catch (error) {
-            return null;
-        }
+        let int = Number(ip.split('.').map(d => ("000" + d).substr(-3)).join(''));
+        return !isNaN(int) ? int : null;
     }
 }
 
