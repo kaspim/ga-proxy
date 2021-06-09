@@ -80,7 +80,7 @@ class AnalyticsProxy {
     }
 
     private static ipv4int(ip: string) {
-        let int = Number(ip.split('.').map(d => ("000" + d).substr(-3)).join(''));
+        let int = Number(ip.split('.').map(d => ('000' + d).substr(-3)).join(''));
         return !isNaN(int) ? int : null;
     }
 }
