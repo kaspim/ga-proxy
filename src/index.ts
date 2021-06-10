@@ -22,6 +22,16 @@ server.on('error', (message) => {
     console.log(message);
 });
 
+server.on('quit', (signal) => {
+    console.info('Received ' + signal + ' signal. Closing server.');
+    server.close(() => {
+        console.log('Server closed.');
+    });
+});
+
 server.listen(config.PROXY_PORT || 8080, () => {
     console.log('Server listening on port ' + String(config.PROXY_PORT || 8080));
 });
+
+process.on('SIGINT', () => server.emit('quit', 'SIGINT'));
+process.on('SIGTERM', () => server.emit('quit', 'SIGTERM'));
